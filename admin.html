@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Check Click Status</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: #333;
+        }
+        .container {
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #FF6B6B;
+            margin-bottom: 30px;
+        }
+        .button {
+            background-color: #4ECDC4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        .button:hover {
+            background-color: #45B7AA;
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        #resetButton {
+            background-color: #FF6B6B;
+        }
+        #resetButton:hover {
+            background-color: #FF8787;
+        }
+        #status {
+            font-size: 20px;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #F7F7F7;
+        }
+        #clickCount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FF6B6B;
+            margin-top: 20px;
+        }
+        #debug {
+            margin-top: 30px;
+            text-align: left;
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        .error {
+            color: #FF4136;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Click Status Dashboard</h1>
+        <button id="checkButton" class="button">Check Now</button>
+        <button id="resetButton" class="button">Reset Count</button>
+        <div id="status"></div>
+        <div id="clickCount"></div>
+        <div id="debug"></div>
+    </div>
+
+    <script>
+        const binId = '66a502e8e41b4d34e417d73f';
+        const apiKey = '$2a$10$t6bIqr4SSth0Cc.kTH3URu6jnktKVGefOs81InLEgHjm9jhopKlP2';
+
+        const checkButton = document.getElementById('checkButton');
+        const resetButton = document.getElementById('resetButton');
+        const statusElement = document.getElementById('status');
+        const clickCountElement = document.getElementById('clickCount');
+        const debugElement = document.getElementById('debug');
+
+        checkButton.addEventListener('click', checkStatus);
+        resetButton.addEventListener('click', resetCount);
+
+        async function checkStatus() {
+            statusElement.textContent = 'Checking status...';
+            debugElement.innerHTML = '';
+            clickCountElement.textContent = '';
+
+            const url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
+            try {
+                logDebug('Fetching data from: ' + url);
+                const response = await fetch(url, {
+                    headers: {
+                        'X-Master-Key': apiKey
+                    }
+                });
+                logDebug('Response status: ' + response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                logDebug('Received data: ' + JSON.stringify(data, null, 2));
+
+                if (data.record && typeof data.record.count !== 'undefined') {
+                    statusElement.textContent = `Last update on: ${new Date(data.record.timestamp).toLocaleString()}`;
+                    clickCountElement.textContent = `Total Clicks (JSONbin): ${data.record.count}`;
+                } else {
+                    throw new Error('Unexpected data structure');
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+                statusElement.textContent = 'Error accessing JSONbin. Displaying local data.';
+                const localCount = localStorage.getItem('clickCount') || '0';
+                clickCountElement.textContent = `Total Clicks (Local Storage): ${localCount}`;
+                logDebug('Error: ' + error.message, true);
+            }
+        }
+
+        async function resetCount() {
+            statusElement.textContent = 'Resetting count...';
+            debugElement.innerHTML = '';
+            clickCountElement.textContent = '';
+
+            // Reset local storage
+            localStorage.setItem('clickCount', '0');
+
+            // Reset JSONbin
+            const url = `https://api.jsonbin.io/v3/b/${binId}`;
+            try {
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': apiKey
+                    },
+                    body: JSON.stringify({ count: 0, timestamp: new Date().toISOString() })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                statusElement.textContent = 'Count reset successfully!';
+                clickCountElement.textContent = 'Total Clicks: 0';
+            } catch (error) {
+                console.error('Error resetting count:', error);
+                statusElement.textContent = 'Error resetting JSONbin. Local storage has been reset.';
+                clickCountElement.textContent = 'Total Clicks (Local Storage): 0';
+                logDebug('Error: ' + error.message, true);
+            }
+        }
+
+        function logDebug(message, isError = false) {
+            const p = document.createElement('p');
+            p.textContent = message;
+            if (isError) p.classList.add('error');
+            debugElement.appendChild(p);
+        }
+    </script>
+</body>
+</html>
